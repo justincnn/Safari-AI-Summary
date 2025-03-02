@@ -10,6 +10,10 @@ A powerful browser extension that adds AI-powered page summarization functionali
 - ✨ Markdown rendering support for better summary formatting
 - 🔧 Configurable API settings and custom prompts
 - 📋 Easy copy-to-clipboard functionality
+- 🔄 Cross-platform compatibility (Tampermonkey & Userscripts)
+- 📱 Vertical draggable interface for better positioning
+- 💾 Local storage support for configurations
+- 🛡️ Fallback support for markdown rendering
 
 ## Installation
 
