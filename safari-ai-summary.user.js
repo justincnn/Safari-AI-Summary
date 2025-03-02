@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Safari AI Summary
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.6
 // @description  为Safari添加AI页面总结功能
 // @author       Justin Ye
 // @match        *://*/*
@@ -23,17 +23,55 @@
     };
 
     // 获取配置
-    let config = {
-        apiUrl: GM_getValue('apiUrl', defaultConfig.apiUrl),
-        apiKey: GM_getValue('apiKey', defaultConfig.apiKey),
-        prompt: GM_getValue('prompt', defaultConfig.prompt),
-        shortcut: GM_getValue('shortcut', defaultConfig.shortcut),
-        model: GM_getValue('model', defaultConfig.model)  // 添加模型配置获取
+    // 添加 GM 函数兼容层
+    const GM = {
+        setValue: (key, value) => {
+            try {
+                if (typeof GM_setValue !== 'undefined') {
+                    GM_setValue(key, defaultValue);
+                } else {
+                    localStorage.setItem(`safari_ai_summary_${key}`, JSON.stringify(value));
+                }
+            } catch (error) {
+                console.error('保存配置失败:', error);
+            }
+        },
+        getValue: (key, defaultValue) => {
+            try {
+                if (typeof GM_getValue !== 'undefined') {
+                    return GM_getValue(key, defaultValue);
+                }
+                const value = localStorage.getItem(`safari_ai_summary_${key}`);
+                return value ? JSON.parse(value) : defaultValue;
+            } catch (error) {
+                console.error('获取配置失败:', error);
+                return defaultValue;
+            }
+        }
     };
 
-    // 添加marked.js库
+    // 修改配置获取方式
+    let config = {
+        apiUrl: GM.getValue('apiUrl', defaultConfig.apiUrl),
+        apiKey: GM.getValue('apiKey', defaultConfig.apiKey),
+        prompt: GM.getValue('prompt', defaultConfig.prompt),
+        shortcut: GM.getValue('shortcut', defaultConfig.shortcut),
+        model: GM.getValue('model', defaultConfig.model)
+    };
+
+    // 修改 marked.js 加载方式
+    let markedLoaded = false;
     const markedScript = document.createElement('script');
     markedScript.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+    markedScript.onload = () => {
+        markedLoaded = true;
+        // 配置 marked 选项
+        marked.setOptions({
+            breaks: true,  // 支持换行
+            gfm: true,    // 支持 GitHub 风格 Markdown
+            headerIds: false
+        });
+    };
     document.head.appendChild(markedScript);
 
     // 创建样式
@@ -217,17 +255,17 @@
 
     function drag(e) {
         if (!isDragging) return;
-        
+
         e.preventDefault();
         const currentY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
         const deltaY = startY - currentY;  // 反转差值计算
-        
+
         let newBottom = currentBottom + deltaY;
         const maxBottom = window.innerHeight - buttonsContainer.offsetHeight - 20;
-        
+
         // 限制拖动范围
         newBottom = Math.max(20, Math.min(newBottom, maxBottom));
-        
+
         buttonsContainer.style.bottom = `${newBottom}px`;
         buttonsContainer.style.top = 'auto';  // 清除 top 属性
     }
@@ -284,17 +322,20 @@
     document.body.appendChild(resultPanel);
 
     // 保存配置
+    // 修改保存配置部分
     document.getElementById('aiSaveConfig').addEventListener('click', () => {
         config.apiUrl = document.getElementById('aiApiUrl').value;
         config.apiKey = document.getElementById('aiApiKey').value;
         config.prompt = document.getElementById('aiPrompt').value;
         config.shortcut = document.getElementById('aiShortcut').value;
-        config.model = document.getElementById('aiModel').value;  // 添加模型保存
-        GM_setValue('apiUrl', config.apiUrl);
-        GM_setValue('apiKey', config.apiKey);
-        GM_setValue('prompt', config.prompt);
-        GM_setValue('shortcut', config.shortcut);
-        GM_setValue('model', config.model);  // 添加模型保存
+        config.model = document.getElementById('aiModel').value;
+        
+        GM.setValue('apiUrl', config.apiUrl);
+        GM.setValue('apiKey', config.apiKey);
+        GM.setValue('prompt', config.prompt);
+        GM.setValue('shortcut', config.shortcut);
+        GM.setValue('model', config.model);
+        
         configPanel.classList.remove('show');
     });
 
@@ -352,7 +393,7 @@
             return;
         }
 
-        const pageContent = document.body.innerText.substring(0, 4000); // 限制内容长度
+        const pageContent = document.body.innerText.substring(0, 4000);
         resultPanel.innerHTML = '正在生成总结...';
         resultPanel.classList.add('show');
 
@@ -364,7 +405,7 @@
                     'Authorization': `Bearer ${config.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: config.model,  // 使用配置的模型
+                    model: config.model,
                     messages: [
                         {
                             role: 'system',
@@ -381,7 +422,34 @@
             const data = await response.json();
             if (data.choices && data.choices[0]) {
                 const rawContent = data.choices[0].message.content;
-                const summaryContent = marked.parse(rawContent);
+                let summaryContent;
+                
+                // 等待 marked.js 加载完成
+                if (!markedLoaded) {
+                    await new Promise(resolve => {
+                        const checkMarked = setInterval(() => {
+                            if (markedLoaded) {
+                                clearInterval(checkMarked);
+                                resolve();
+                            }
+                        }, 100);
+                    });
+                }
+
+                try {
+                    // 使用 marked 渲染 Markdown
+                    summaryContent = marked.parse(rawContent);
+                } catch (error) {
+                    console.error('Markdown 渲染失败:', error);
+                    // 降级处理：基本文本格式化
+                    summaryContent = rawContent
+                        .replace(/\n\n/g, '</p><p>')
+                        .replace(/\n/g, '<br>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                    summaryContent = `<p>${summaryContent}</p>`;
+                }
+
                 resultPanel.innerHTML = `
                     <div class="summary-content">${summaryContent}</div>
                     <div class="ai-summary-actions">
