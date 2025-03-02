@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Safari AI Summary
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.3
 // @description  为Safari添加AI页面总结功能
 // @author       Justin Ye
 // @match        *://*/*
@@ -18,7 +18,8 @@
         apiUrl: 'https://api.openai.com/v1/chat/completions',
         apiKey: '',
         prompt: '请对以下网页内容进行简要总结，突出重点信息。',
-        shortcut: 'Alt+A'
+        shortcut: 'Alt+A',
+        model: 'gpt-3.5-turbo'  // 添加默认模型
     };
 
     // 获取配置
@@ -26,7 +27,8 @@
         apiUrl: GM_getValue('apiUrl', defaultConfig.apiUrl),
         apiKey: GM_getValue('apiKey', defaultConfig.apiKey),
         prompt: GM_getValue('prompt', defaultConfig.prompt),
-        shortcut: GM_getValue('shortcut', defaultConfig.shortcut)
+        shortcut: GM_getValue('shortcut', defaultConfig.shortcut),
+        model: GM_getValue('model', defaultConfig.model)  // 添加模型配置获取
     };
 
     // 添加marked.js库
@@ -40,8 +42,11 @@
         .ai-buttons-container {
             position: fixed;
             right: 20px;
-            bottom: 20px;
+            bottom: 20px;  /* 恢复默认位置为右下角 */
             z-index: 2147483647;
+            cursor: ns-resize;
+            user-select: none;
+            touch-action: pan-y;
         }
         .ai-summary-btn {
             position: relative;
@@ -191,6 +196,53 @@
     buttonsContainer.className = 'ai-buttons-container';
     document.body.appendChild(buttonsContainer);
 
+    // 添加拖拽功能
+    // 修改拖拽相关变量和函数
+    let isDragging = false;
+    let startY = 0;
+    let currentBottom = 20;  // 改为从底部计算位置
+
+    function dragStart(e) {
+        if (e.target === buttonsContainer || e.target === summaryButton) {
+            isDragging = true;
+            startY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
+            const rect = buttonsContainer.getBoundingClientRect();
+            currentBottom = window.innerHeight - rect.bottom;
+        }
+    }
+
+    function dragEnd() {
+        isDragging = false;
+    }
+
+    function drag(e) {
+        if (!isDragging) return;
+        
+        e.preventDefault();
+        const currentY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
+        const deltaY = startY - currentY;  // 反转差值计算
+        
+        let newBottom = currentBottom + deltaY;
+        const maxBottom = window.innerHeight - buttonsContainer.offsetHeight - 20;
+        
+        // 限制拖动范围
+        newBottom = Math.max(20, Math.min(newBottom, maxBottom));
+        
+        buttonsContainer.style.bottom = `${newBottom}px`;
+        buttonsContainer.style.top = 'auto';  // 清除 top 属性
+    }
+
+    buttonsContainer.addEventListener("touchstart", dragStart, false);
+    buttonsContainer.addEventListener("touchend", dragEnd, false);
+    buttonsContainer.addEventListener("touchmove", drag, false);
+
+    buttonsContainer.addEventListener("mousedown", dragStart, false);
+    document.addEventListener("mousemove", drag, false);
+    document.addEventListener("mouseup", dragEnd, false);
+
+    // 设置初始位置
+    // buttonsContainer.style.top = '20px';
+
     // 创建AI总结按钮
     const summaryButton = document.createElement('button');
     summaryButton.className = 'ai-summary-btn';
@@ -209,6 +261,10 @@
         <div class="input-group">
             <label for="aiApiKey">API Key</label>
             <input type="password" id="aiApiKey" value="${config.apiKey}">
+        </div>
+        <div class="input-group">
+            <label for="aiModel">AI 模型</label>
+            <input type="text" id="aiModel" value="${config.model}" placeholder="例如：gpt-3.5-turbo">
         </div>
         <div class="input-group">
             <label for="aiPrompt">自定义提示词</label>
@@ -233,10 +289,12 @@
         config.apiKey = document.getElementById('aiApiKey').value;
         config.prompt = document.getElementById('aiPrompt').value;
         config.shortcut = document.getElementById('aiShortcut').value;
+        config.model = document.getElementById('aiModel').value;  // 添加模型保存
         GM_setValue('apiUrl', config.apiUrl);
         GM_setValue('apiKey', config.apiKey);
         GM_setValue('prompt', config.prompt);
         GM_setValue('shortcut', config.shortcut);
+        GM_setValue('model', config.model);  // 添加模型保存
         configPanel.classList.remove('show');
     });
 
@@ -249,9 +307,9 @@
         if (e.altKey) keys.push('Alt');
         if (e.shiftKey) keys.push('Shift');
         if (e.metaKey) keys.push('Meta');
-        if (e.key.toUpperCase() !== 'CONTROL' && 
-            e.key.toUpperCase() !== 'ALT' && 
-            e.key.toUpperCase() !== 'SHIFT' && 
+        if (e.key.toUpperCase() !== 'CONTROL' &&
+            e.key.toUpperCase() !== 'ALT' &&
+            e.key.toUpperCase() !== 'SHIFT' &&
             e.key.toUpperCase() !== 'META') {
             keys.push(e.key.toUpperCase());
         }
@@ -267,9 +325,9 @@
         if (e.altKey) keys.push('Alt');
         if (e.shiftKey) keys.push('Shift');
         if (e.metaKey) keys.push('Meta');
-        if (e.key.toUpperCase() !== 'CONTROL' && 
-            e.key.toUpperCase() !== 'ALT' && 
-            e.key.toUpperCase() !== 'SHIFT' && 
+        if (e.key.toUpperCase() !== 'CONTROL' &&
+            e.key.toUpperCase() !== 'ALT' &&
+            e.key.toUpperCase() !== 'SHIFT' &&
             e.key.toUpperCase() !== 'META') {
             keys.push(e.key.toUpperCase());
         }
@@ -306,7 +364,7 @@
                     'Authorization': `Bearer ${config.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: 'gpt-3.5-turbo',
+                    model: config.model,  // 使用配置的模型
                     messages: [
                         {
                             role: 'system',
@@ -350,8 +408,8 @@
 
     // 点击其他地方关闭面板
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.ai-summary-btn') && 
-            !e.target.closest('.ai-config-panel') && 
+        if (!e.target.closest('.ai-summary-btn') &&
+            !e.target.closest('.ai-config-panel') &&
             !e.target.closest('.ai-summary-result')) {
             configPanel.classList.remove('show');
             resultPanel.classList.remove('show');
