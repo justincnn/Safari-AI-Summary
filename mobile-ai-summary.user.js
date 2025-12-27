@@ -693,10 +693,14 @@
         if (!config.apiKey) {
             alert('请先配置 API Key');
             renderSheetContent('settings');
+            mainSheet.classList.add('show');
+            showOverlay();
             return;
         }
 
         renderSheetContent('result', '<p>正在分析页面内容...</p>');
+        mainSheet.classList.add('show');
+        showOverlay();
         
         const pageContent = document.body.innerText.substring(0, 5000);
 
