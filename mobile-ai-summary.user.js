@@ -504,11 +504,7 @@
                 <div class="mas-sheet-content">
                     <div class="mas-sheet-header">
                         <span>AI 页面总结</span>
-                        <button class="mas-icon-btn" id="masGoSettings" title="设置">
-                            <svg style="width:24px;height:24px;fill:currentColor" viewBox="0 0 24 24">
-                                <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.52c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
-                            </svg>
-                        </button>
+                        <!-- Settings button removed from here -->
                     </div>
                     <div style="margin-bottom: 24px;">
                         <p style="margin-bottom: 8px; font-size: 14px; color: var(--mas-on-surface-variant);">当前页面：</p>
@@ -583,9 +579,7 @@
 
     function bindEvents(view) {
         if (view === 'home') {
-            document.getElementById('masGoSettings').addEventListener('click', () => {
-                renderSheetContent('settings');
-            });
+            // Settings button event removed
             document.getElementById('masStartSummary').addEventListener('click', startSummary);
         } else if (view === 'settings') {
             document.getElementById('masBackHome').addEventListener('click', () => {
@@ -645,11 +639,53 @@
         setTimeout(() => renderSheetContent('home'), 300);
     });
 
-    // 主按钮点击
+    // 主按钮交互：单击总结，长按设置
+    let longPressTimer;
+    let isLongPress = false;
+
+    mainFab.addEventListener('touchstart', (e) => {
+        isLongPress = false;
+        longPressTimer = setTimeout(() => {
+            isLongPress = true;
+            // 触发振动反馈
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+            renderSheetContent('settings');
+            mainSheet.classList.add('show');
+            showOverlay();
+        }, 500); // 500ms 定义为长按
+    });
+
+    mainFab.addEventListener('touchend', () => {
+        clearTimeout(longPressTimer);
+        if (!isLongPress) {
+            // 这是单击
+            startSummary();
+        }
+    });
+    
+    mainFab.addEventListener('touchmove', () => {
+        // 如果手指移动，取消长按计时器
+        clearTimeout(longPressTimer);
+    });
+
+    // 为桌面端保留单击和右键单击行为
     mainFab.addEventListener('click', () => {
-        renderSheetContent('home');
-        mainSheet.classList.add('show');
-        showOverlay();
+        // 在桌面端，单击直接总结
+        if (!('ontouchstart' in window)) {
+            startSummary();
+        }
+    });
+
+    mainFab.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        // 在桌面端，右键单击打开设置
+        if (!('ontouchstart' in window)) {
+            renderSheetContent('settings');
+            mainSheet.classList.add('show');
+            showOverlay();
+        }
     });
 
     // 开始总结逻辑
