@@ -1,17 +1,49 @@
 // ==UserScript==
 // @name         Mobile AI Summary (MD3)
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  为移动端设计的AI页面总结工具，采用Material Design 3风格
 // @author       Justin Ye
 // @match        *://*/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
+// @connect      api.openai.com
+// @connect      *
 // ==/UserScript==
 
 (function() {
     'use strict';
+
+    // 封装 GM_xmlhttpRequest 为 Promise 形式，解决跨域问题
+    function gmFetch(url, options) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: options.method || 'GET',
+                url: url,
+                headers: options.headers,
+                data: options.body,
+                onload: (response) => {
+                    if (response.status >= 200 && response.status < 300) {
+                        resolve({
+                            json: () => Promise.resolve(JSON.parse(response.responseText)),
+                            text: () => Promise.resolve(response.responseText),
+                            status: response.status
+                        });
+                    } else {
+                        reject(new Error(`HTTP error! status: ${response.status} ${response.statusText || ''}\nResponse: ${response.responseText.substring(0, 100)}...`));
+                    }
+                },
+                onerror: (error) => {
+                    console.error('GM_xmlhttpRequest error:', error);
+                    reject(new Error('Network error: Failed to fetch'));
+                },
+                ontimeout: () => {
+                    reject(new Error('Request timeout'));
+                }
+            });
+        });
+    }
 
     // MD3 风格定义
     const md3Colors = {
@@ -131,8 +163,8 @@
 
         .mas-fab-container {
             position: fixed;
-            right: 16px;
-            bottom: 100px; /* 避开底部导航栏 */
+            left: 16px; /* 移到左侧 */
+            bottom: 80px; /* 避开底部导航栏 */
             z-index: 999999;
             display: flex;
             flex-direction: column;
@@ -349,30 +381,16 @@
     const fabContainer = document.createElement('div');
     fabContainer.className = 'mas-fab-container';
     
-    // 总结按钮 FAB
-    const summaryFab = document.createElement('button');
-    summaryFab.className = 'mas-fab';
-    summaryFab.innerHTML = `
+    // 主 FAB (合并了总结和设置入口)
+    const mainFab = document.createElement('button');
+    mainFab.className = 'mas-fab';
+    mainFab.innerHTML = `
         <svg viewBox="0 0 24 24">
             <path d="M14,17H7V15H14M17,13H7V11H17M17,9H7V7H17M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3Z" />
         </svg>
     `;
     
-    // 设置按钮 FAB (小一点)
-    const settingsFab = document.createElement('button');
-    settingsFab.className = 'mas-fab';
-    settingsFab.style.width = '40px';
-    settingsFab.style.height = '40px';
-    settingsFab.style.borderRadius = '12px';
-    settingsFab.style.alignSelf = 'flex-end';
-    settingsFab.innerHTML = `
-        <svg viewBox="0 0 24 24">
-            <path d="M19.14,12.94C19.14,12.78 19.14,12.61 19.14,12.45C19.14,12.29 19.14,12.12 19.14,11.96L21.41,10.19C21.61,10.03 21.67,9.75 21.54,9.53L19.38,5.79C19.25,5.57 18.97,5.48 18.74,5.57L16.07,6.65C15.5,6.23 14.9,5.87 14.25,5.6L13.84,2.76C13.8,2.5 13.59,2.31 13.33,2.31H9.03C8.77,2.31 8.56,2.5 8.53,2.76L8.11,5.6C7.46,5.87 6.86,6.23 6.29,6.65L3.62,5.57C3.39,5.48 3.11,5.57 2.98,5.79L0.82,9.53C0.69,9.75 0.75,10.03 0.95,10.19L3.22,11.96C3.22,12.12 3.22,12.29 3.22,12.45C3.22,12.61 3.22,12.78 3.22,12.94L0.95,14.71C0.75,14.87 0.69,15.15 0.82,15.37L2.98,19.11C3.11,19.33 3.39,19.42 3.62,19.33L6.29,18.25C6.86,18.67 7.46,19.03 8.11,19.3L8.53,22.14C8.56,22.4 8.77,22.59 9.03,22.59H13.33C13.59,22.59 13.8,22.4 13.84,22.14L14.25,19.3C14.9,19.03 15.5,18.67 16.07,18.25L18.74,19.33C18.97,19.42 19.25,19.33 19.38,19.11L21.54,15.37C21.67,15.15 21.61,14.87 21.41,14.71L19.14,12.94M11.18,15.06C9.5,15.06 8.14,13.7 8.14,12.03C8.14,10.36 9.5,9 11.18,9C12.86,9 14.22,10.36 14.22,12.03C14.22,13.7 12.86,15.06 11.18,15.06Z" />
-        </svg>
-    `;
-
-    fabContainer.appendChild(settingsFab);
-    fabContainer.appendChild(summaryFab);
+    fabContainer.appendChild(mainFab);
     document.body.appendChild(fabContainer);
 
     // 遮罩层
@@ -380,54 +398,145 @@
     overlay.className = 'mas-overlay';
     document.body.appendChild(overlay);
 
-    // 设置面板 Bottom Sheet
-    const settingsSheet = document.createElement('div');
-    settingsSheet.className = 'mas-bottom-sheet';
-    settingsSheet.innerHTML = `
-        <div class="mas-drag-handle"></div>
-        <div class="mas-sheet-content">
-            <div class="mas-sheet-header">设置</div>
-            <div class="mas-input-group">
-                <label class="mas-label">API URL</label>
-                <input type="text" class="mas-input" id="masApiUrl" value="${config.apiUrl}">
-            </div>
-            <div class="mas-input-group">
-                <label class="mas-label">API Key</label>
-                <input type="password" class="mas-input" id="masApiKey" value="${config.apiKey}">
-            </div>
-            <div class="mas-input-group">
-                <label class="mas-label">模型</label>
-                <input type="text" class="mas-input" id="masModel" value="${config.model}">
-            </div>
-            <div class="mas-input-group">
-                <label class="mas-label">提示词</label>
-                <textarea class="mas-textarea" id="masPrompt">${config.prompt}</textarea>
-            </div>
-            <button class="mas-btn" id="masSaveConfig">保存</button>
-        </div>
-    `;
-    document.body.appendChild(settingsSheet);
+    // 主面板 Bottom Sheet (包含首页、设置、结果)
+    const mainSheet = document.createElement('div');
+    mainSheet.className = 'mas-bottom-sheet';
+    
+    // 渲染主面板内容
+    function renderSheetContent(view = 'home', data = null) {
+        let content = '';
+        
+        if (view === 'home') {
+            content = `
+                <div class="mas-drag-handle"></div>
+                <div class="mas-sheet-content">
+                    <div class="mas-sheet-header">
+                        <span>AI 页面总结</span>
+                        <button class="mas-icon-btn" id="masGoSettings" title="设置">
+                            <svg style="width:24px;height:24px;fill:currentColor" viewBox="0 0 24 24">
+                                <path d="M19.14,12.94C19.14,12.78 19.14,12.61 19.14,12.45C19.14,12.29 19.14,12.12 19.14,11.96L21.41,10.19C21.61,10.03 21.67,9.75 21.54,9.53L19.38,5.79C19.25,5.57 18.97,5.48 18.74,5.57L16.07,6.65C15.5,6.23 14.9,5.87 14.25,5.6L13.84,2.76C13.8,2.5 13.59,2.31 13.33,2.31H9.03C8.77,2.31 8.56,2.5 8.53,2.76L8.11,5.6C7.46,5.87 6.86,6.23 6.29,6.65L3.62,5.57C3.39,5.48 3.11,5.57 2.98,5.79L0.82,9.53C0.69,9.75 0.75,10.03 0.95,10.19L3.22,11.96C3.22,12.12 3.22,12.29 3.22,12.45C3.22,12.61 3.22,12.78 3.22,12.94L0.95,14.71C0.75,14.87 0.69,15.15 0.82,15.37L2.98,19.11C3.11,19.33 3.39,19.42 3.62,19.33L6.29,18.25C6.86,18.67 7.46,19.03 8.11,19.3L8.53,22.14C8.56,22.4 8.77,22.59 9.03,22.59H13.33C13.59,22.59 13.8,22.4 13.84,22.14L14.25,19.3C14.9,19.03 15.5,18.67 16.07,18.25L18.74,19.33C18.97,19.42 19.25,19.33 19.38,19.11L21.54,15.37C21.67,15.15 21.61,14.87 21.41,14.71L19.14,12.94M11.18,15.06C9.5,15.06 8.14,13.7 8.14,12.03C8.14,10.36 9.5,9 11.18,9C12.86,9 14.22,10.36 14.22,12.03C14.22,13.7 12.86,15.06 11.18,15.06Z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div style="margin-bottom: 24px;">
+                        <p style="margin-bottom: 8px; font-size: 14px; color: var(--md-sys-color-outline);">当前页面：</p>
+                        <p style="font-weight: 500; line-height: 1.4;">${document.title}</p>
+                    </div>
+                    <button class="mas-btn" id="masStartSummary">
+                        <svg style="width:20px;height:20px;margin-right:8px;fill:currentColor" viewBox="0 0 24 24">
+                            <path d="M14,17H7V15H14M17,13H7V11H17M17,9H7V7H17M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3Z" />
+                        </svg>
+                        开始总结
+                    </button>
+                </div>
+            `;
+        } else if (view === 'settings') {
+            content = `
+                <div class="mas-drag-handle"></div>
+                <div class="mas-sheet-content">
+                    <div class="mas-sheet-header">
+                        <span>设置</span>
+                        <button class="mas-icon-btn" id="masBackHome">
+                            <svg style="width:24px;height:24px;fill:currentColor" viewBox="0 0 24 24">
+                                <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="mas-input-group">
+                        <label class="mas-label">API URL</label>
+                        <input type="text" class="mas-input" id="masApiUrl" value="${config.apiUrl}">
+                    </div>
+                    <div class="mas-input-group">
+                        <label class="mas-label">API Key</label>
+                        <input type="password" class="mas-input" id="masApiKey" value="${config.apiKey}">
+                    </div>
+                    <div class="mas-input-group">
+                        <label class="mas-label">模型</label>
+                        <input type="text" class="mas-input" id="masModel" value="${config.model}">
+                    </div>
+                    <div class="mas-input-group">
+                        <label class="mas-label">提示词</label>
+                        <textarea class="mas-textarea" id="masPrompt">${config.prompt}</textarea>
+                    </div>
+                    <button class="mas-btn" id="masSaveConfig">保存并返回</button>
+                </div>
+            `;
+        } else if (view === 'result') {
+            content = `
+                <div class="mas-drag-handle"></div>
+                <div class="mas-sheet-content">
+                    <div class="mas-sheet-header">
+                        <span>总结结果</span>
+                        <button class="mas-icon-btn" id="masCloseResult">
+                            <svg style="width:24px;height:24px;fill:currentColor" viewBox="0 0 24 24">
+                                <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="masResultContent" class="mas-result-content">${data || '<p>正在生成...</p>'}</div>
+                    <div class="mas-actions">
+                        <button class="mas-btn" id="masCopyBtn">复制内容</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        mainSheet.innerHTML = content;
+        bindEvents(view);
+    }
 
-    // 结果面板 Bottom Sheet
-    const resultSheet = document.createElement('div');
-    resultSheet.className = 'mas-bottom-sheet';
-    resultSheet.innerHTML = `
-        <div class="mas-drag-handle"></div>
-        <div class="mas-sheet-content">
-            <div class="mas-sheet-header">AI 总结</div>
-            <div id="masResultContent" class="mas-result-content"></div>
-            <div class="mas-actions">
-                <button class="mas-btn" id="masCopyBtn">复制</button>
-                <button class="mas-btn mas-btn-text" id="masCloseResultBtn">关闭</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(resultSheet);
+    function bindEvents(view) {
+        if (view === 'home') {
+            document.getElementById('masGoSettings').addEventListener('click', () => {
+                renderSheetContent('settings');
+            });
+            document.getElementById('masStartSummary').addEventListener('click', startSummary);
+        } else if (view === 'settings') {
+            document.getElementById('masBackHome').addEventListener('click', () => {
+                renderSheetContent('home');
+            });
+            document.getElementById('masSaveConfig').addEventListener('click', () => {
+                config.apiUrl = document.getElementById('masApiUrl').value;
+                config.apiKey = document.getElementById('masApiKey').value;
+                config.prompt = document.getElementById('masPrompt').value;
+                config.model = document.getElementById('masModel').value;
+
+                GM.setValue('apiUrl', config.apiUrl);
+                GM.setValue('apiKey', config.apiKey);
+                GM.setValue('prompt', config.prompt);
+                GM.setValue('model', config.model);
+                
+                alert('配置已保存');
+                renderSheetContent('home');
+            });
+        } else if (view === 'result') {
+            document.getElementById('masCloseResult').addEventListener('click', () => {
+                mainSheet.classList.remove('show');
+                hideOverlay();
+                // 延迟重置为首页
+                setTimeout(() => renderSheetContent('home'), 300);
+            });
+            
+            const copyBtn = document.getElementById('masCopyBtn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', () => {
+                    const text = document.getElementById('masResultContent').innerText;
+                    navigator.clipboard.writeText(text).then(() => {
+                        const originalText = copyBtn.innerText;
+                        copyBtn.innerText = '已复制';
+                        setTimeout(() => copyBtn.innerText = originalText, 2000);
+                    });
+                });
+            }
+        }
+    }
+
+    document.body.appendChild(mainSheet);
 
     // 交互逻辑
     function showOverlay() {
         overlay.classList.add('show');
-        document.body.style.overflow = 'hidden'; // 防止背景滚动
+        document.body.style.overflow = 'hidden';
     }
 
     function hideOverlay() {
@@ -435,56 +544,35 @@
         document.body.style.overflow = '';
     }
 
-    function closeAllSheets() {
-        settingsSheet.classList.remove('show');
-        resultSheet.classList.remove('show');
-        hideOverlay();
-    }
-
     // 点击遮罩关闭
-    overlay.addEventListener('click', closeAllSheets);
+    overlay.addEventListener('click', () => {
+        mainSheet.classList.remove('show');
+        hideOverlay();
+        setTimeout(() => renderSheetContent('home'), 300);
+    });
 
-    // 设置按钮点击
-    settingsFab.addEventListener('click', () => {
-        settingsSheet.classList.add('show');
+    // 主按钮点击
+    mainFab.addEventListener('click', () => {
+        renderSheetContent('home');
+        mainSheet.classList.add('show');
         showOverlay();
     });
 
-    // 保存配置
-    document.getElementById('masSaveConfig').addEventListener('click', () => {
-        config.apiUrl = document.getElementById('masApiUrl').value;
-        config.apiKey = document.getElementById('masApiKey').value;
-        config.prompt = document.getElementById('masPrompt').value;
-        config.model = document.getElementById('masModel').value;
-
-        GM.setValue('apiUrl', config.apiUrl);
-        GM.setValue('apiKey', config.apiKey);
-        GM.setValue('prompt', config.prompt);
-        GM.setValue('model', config.model);
-
-        closeAllSheets();
-        // 可以添加一个简单的 Toast 提示
-        alert('配置已保存');
-    });
-
-    // 总结按钮点击
-    summaryFab.addEventListener('click', async () => {
+    // 开始总结逻辑
+    async function startSummary() {
         if (!config.apiKey) {
             alert('请先配置 API Key');
-            settingsSheet.classList.add('show');
-            showOverlay();
+            renderSheetContent('settings');
             return;
         }
 
-        const resultContent = document.getElementById('masResultContent');
-        resultContent.innerHTML = '<p>正在分析页面内容...</p>';
-        resultSheet.classList.add('show');
-        showOverlay();
-
-        const pageContent = document.body.innerText.substring(0, 5000); // 增加一点长度限制
+        renderSheetContent('result', '<p>正在分析页面内容...</p>');
+        
+        const pageContent = document.body.innerText.substring(0, 5000);
 
         try {
-            const response = await fetch(config.apiUrl, {
+            // 使用封装的 gmFetch 替代原生 fetch
+            const response = await gmFetch(config.apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -514,30 +602,28 @@
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
 
+                let htmlContent = rawContent;
                 try {
-                    resultContent.innerHTML = marked.parse(rawContent);
+                    htmlContent = marked.parse(rawContent);
                 } catch (e) {
-                    resultContent.innerText = rawContent;
+                    console.error('Markdown parse error', e);
                 }
-
-                // 绑定复制按钮
-                const copyBtn = document.getElementById('masCopyBtn');
-                copyBtn.onclick = () => {
-                    navigator.clipboard.writeText(rawContent).then(() => {
-                        copyBtn.innerText = '已复制';
-                        setTimeout(() => copyBtn.innerText = '复制', 2000);
-                    });
-                };
+                
+                // 更新结果视图内容
+                const contentDiv = document.getElementById('masResultContent');
+                if (contentDiv) {
+                    contentDiv.innerHTML = htmlContent;
+                }
             } else {
                 throw new Error('API 返回数据异常');
             }
         } catch (error) {
-            resultContent.innerHTML = `<p style="color: red;">出错啦: ${error.message}</p>`;
+            const contentDiv = document.getElementById('masResultContent');
+            if (contentDiv) {
+                contentDiv.innerHTML = `<p style="color: red;">出错啦: ${error.message}</p>`;
+            }
         }
-    });
-
-    // 关闭结果面板
-    document.getElementById('masCloseResultBtn').addEventListener('click', closeAllSheets);
+    }
 
     // 简单的拖拽支持 (FAB)
     let isDragging = false;
