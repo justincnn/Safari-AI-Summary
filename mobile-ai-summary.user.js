@@ -657,7 +657,10 @@
         }, 500); // 500ms 定义为长按
     });
 
-    mainFab.addEventListener('touchend', () => {
+    mainFab.addEventListener('touchend', (e) => {
+        // Prevent the browser from firing a "ghost" click event after the touch ends.
+        // This was causing the overlay to immediately close the panel.
+        e.preventDefault();
         clearTimeout(longPressTimer);
         if (!isLongPress) {
             // 这是单击
