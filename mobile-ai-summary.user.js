@@ -47,15 +47,32 @@
 
     // MD3 风格定义
     const md3Colors = {
-        primary: '#006492',
-        onPrimary: '#ffffff',
-        primaryContainer: '#cae6ff',
-        onPrimaryContainer: '#001e30',
-        surface: '#f8f9ff',
-        onSurface: '#191c20',
-        surfaceContainer: '#f0f4f8', // 稍微深一点的背景
-        outline: '#72777f',
-        shadow: 'rgba(0, 0, 0, 0.2)'
+        light: {
+            primary: '#006492',
+            onPrimary: '#ffffff',
+            primaryContainer: '#cae6ff',
+            onPrimaryContainer: '#001e30',
+            surface: '#f8f9ff',
+            onSurface: '#191c20',
+            surfaceContainer: '#f0f4f8',
+            outline: '#72777f',
+            shadow: 'rgba(0, 0, 0, 0.2)',
+            surfaceVariant: '#dde3ea',
+            onSurfaceVariant: '#41484d'
+        },
+        dark: {
+            primary: '#8ccceb',
+            onPrimary: '#00344e',
+            primaryContainer: '#004b6f',
+            onPrimaryContainer: '#cae6ff',
+            surface: '#111418',
+            onSurface: '#e1e2e8',
+            surfaceContainer: '#1d2024',
+            outline: '#8c9199',
+            shadow: 'rgba(0, 0, 0, 0.4)',
+            surfaceVariant: '#41484d',
+            onSurfaceVariant: '#c1c7ce'
+        }
     };
 
     // 新的提示词
@@ -94,7 +111,8 @@
         apiUrl: 'https://api.openai.com/v1/chat/completions',
         apiKey: '',
         prompt: newPrompt,
-        model: 'gpt-3.5-turbo'
+        model: 'gpt-3.5-turbo',
+        theme: 'auto' // auto, light, dark
     };
 
     // GM 函数兼容层
@@ -129,7 +147,8 @@
         apiUrl: GM.getValue('apiUrl', defaultConfig.apiUrl),
         apiKey: GM.getValue('apiKey', defaultConfig.apiKey),
         prompt: GM.getValue('prompt', defaultConfig.prompt),
-        model: GM.getValue('model', defaultConfig.model)
+        model: GM.getValue('model', defaultConfig.model),
+        theme: GM.getValue('theme', defaultConfig.theme)
     };
 
     // 加载 marked.js
@@ -150,17 +169,34 @@
     style.textContent = `
         /* Material Design 3 风格样式 */
         :root {
-            --md-sys-color-primary: ${md3Colors.primary};
-            --md-sys-color-on-primary: ${md3Colors.onPrimary};
-            --md-sys-color-primary-container: ${md3Colors.primaryContainer};
-            --md-sys-color-on-primary-container: ${md3Colors.onPrimaryContainer};
-            --md-sys-color-surface: ${md3Colors.surface};
-            --md-sys-color-on-surface: ${md3Colors.onSurface};
-            --md-sys-color-surface-container: ${md3Colors.surfaceContainer};
-            --md-sys-color-outline: ${md3Colors.outline};
-            --md-sys-shadow: ${md3Colors.shadow};
+            --mas-primary: ${md3Colors.light.primary};
+            --mas-on-primary: ${md3Colors.light.onPrimary};
+            --mas-primary-container: ${md3Colors.light.primaryContainer};
+            --mas-on-primary-container: ${md3Colors.light.onPrimaryContainer};
+            --mas-surface: ${md3Colors.light.surface};
+            --mas-on-surface: ${md3Colors.light.onSurface};
+            --mas-surface-container: ${md3Colors.light.surfaceContainer};
+            --mas-outline: ${md3Colors.light.outline};
+            --mas-shadow: ${md3Colors.light.shadow};
+            --mas-surface-variant: ${md3Colors.light.surfaceVariant};
+            --mas-on-surface-variant: ${md3Colors.light.onSurfaceVariant};
         }
 
+        [data-theme="dark"] {
+            --mas-primary: ${md3Colors.dark.primary};
+            --mas-on-primary: ${md3Colors.dark.onPrimary};
+            --mas-primary-container: ${md3Colors.dark.primaryContainer};
+            --mas-on-primary-container: ${md3Colors.dark.onPrimaryContainer};
+            --mas-surface: ${md3Colors.dark.surface};
+            --mas-on-surface: ${md3Colors.dark.onSurface};
+            --mas-surface-container: ${md3Colors.dark.surfaceContainer};
+            --mas-outline: ${md3Colors.dark.outline};
+            --mas-shadow: ${md3Colors.dark.shadow};
+            --mas-surface-variant: ${md3Colors.dark.surfaceVariant};
+            --mas-on-surface-variant: ${md3Colors.dark.onSurfaceVariant};
+        }
+
+        /* Pixel 风格优化 */
         .mas-fab-container {
             position: fixed;
             left: 16px; /* 移到左侧 */
@@ -175,24 +211,24 @@
         .mas-fab {
             width: 56px;
             height: 56px;
-            border-radius: 16px; /* MD3 Large FAB shape */
-            background-color: var(--md-sys-color-primary-container);
-            color: var(--md-sys-color-on-primary-container);
+            border-radius: 20px; /* Pixel 风格更圆润 */
+            background-color: var(--mas-primary-container);
+            color: var(--mas-on-primary-container);
             border: none;
-            box-shadow: 0 4px 8px 3px var(--md-sys-shadow);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 24px;
             cursor: pointer;
             pointer-events: auto;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
             -webkit-tap-highlight-color: transparent;
         }
 
         .mas-fab:active {
-            transform: scale(0.95);
-            box-shadow: 0 2px 4px 2px var(--md-sys-shadow);
+            transform: scale(0.92);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
 
         .mas-fab svg {
@@ -207,18 +243,18 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: var(--md-sys-color-surface);
+            background-color: var(--mas-surface-container);
             border-top-left-radius: 28px;
             border-top-right-radius: 28px;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
             z-index: 1000000;
             transform: translateY(100%);
-            transition: transform 0.3s cubic-bezier(0.2, 0.0, 0, 1.0);
+            transition: transform 0.35s cubic-bezier(0.2, 0, 0, 1);
             max-height: 85vh;
             display: flex;
             flex-direction: column;
-            color: var(--md-sys-color-on-surface);
-            font-family: system-ui, -apple-system, sans-serif;
+            color: var(--mas-on-surface);
+            font-family: 'Google Sans', system-ui, -apple-system, sans-serif; /* 尝试使用 Google Sans */
         }
 
         .mas-bottom-sheet.show {
@@ -228,10 +264,10 @@
         .mas-drag-handle {
             width: 32px;
             height: 4px;
-            background-color: var(--md-sys-color-outline);
+            background-color: var(--mas-outline);
             opacity: 0.4;
             border-radius: 2px;
-            margin: 22px auto 0;
+            margin: 16px auto 0;
             flex-shrink: 0;
         }
 
@@ -245,7 +281,12 @@
             font-size: 22px;
             font-weight: 400;
             margin-bottom: 24px;
-            color: var(--md-sys-color-on-surface);
+            color: var(--mas-on-surface);
+            font-weight: 500;
+        }
+
+        .mas-icon-btn {
+            color: var(--mas-on-surface-variant);
         }
 
         /* 表单样式 */
@@ -256,28 +297,29 @@
         .mas-label {
             display: block;
             font-size: 12px;
-            color: var(--md-sys-color-on-surface);
+            color: var(--mas-on-surface-variant);
             margin-bottom: 8px;
             font-weight: 500;
         }
 
-        .mas-input, .mas-textarea {
+        .mas-input, .mas-textarea, .mas-select {
             width: 100%;
-            padding: 12px 16px;
-            border: 1px solid var(--md-sys-color-outline);
-            border-radius: 4px;
-            background: transparent;
+            padding: 16px;
+            border: 1px solid var(--mas-outline);
+            border-radius: 12px; /* 更圆润的输入框 */
+            background: var(--mas-surface);
             font-size: 16px;
-            color: var(--md-sys-color-on-surface);
+            color: var(--mas-on-surface);
             box-sizing: border-box;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
+            font-family: inherit;
         }
 
-        .mas-input:focus, .mas-textarea:focus {
+        .mas-input:focus, .mas-textarea:focus, .mas-select:focus {
             outline: none;
-            border-color: var(--md-sys-color-primary);
-            border-width: 2px;
-            padding: 11px 15px; /* 补偿边框宽度 */
+            border-color: var(--mas-primary);
+            background: var(--mas-surface-container);
+            box-shadow: 0 0 0 2px var(--mas-primary-container);
         }
 
         .mas-textarea {
@@ -288,29 +330,31 @@
 
         /* 按钮样式 */
         .mas-btn {
-            background-color: var(--md-sys-color-primary);
-            color: var(--md-sys-color-on-primary);
+            background-color: var(--mas-primary);
+            color: var(--mas-on-primary);
             border: none;
-            border-radius: 20px;
-            padding: 10px 24px;
+            border-radius: 24px; /* 完全圆角 */
+            padding: 0 24px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             width: 100%;
-            height: 40px;
+            height: 48px; /* 更高的点击区域 */
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
         }
 
         .mas-btn:active {
             opacity: 0.9;
+            transform: scale(0.98);
         }
 
         .mas-btn-text {
             background: transparent;
-            color: var(--md-sys-color-primary);
+            color: var(--mas-primary);
             margin-top: 8px;
         }
 
@@ -323,16 +367,18 @@
         .mas-result-content h1, .mas-result-content h2, .mas-result-content h3 {
             margin-top: 1em;
             margin-bottom: 0.5em;
-            color: var(--md-sys-color-on-surface);
+            color: var(--mas-on-surface);
         }
 
         .mas-result-content p {
             margin-bottom: 1em;
+            color: var(--mas-on-surface-variant);
         }
 
         .mas-result-content ul {
             padding-left: 20px;
             margin-bottom: 1em;
+            color: var(--mas-on-surface-variant);
         }
 
         .mas-result-content li {
@@ -341,13 +387,16 @@
 
         .mas-result-content strong {
             font-weight: 700;
+            color: var(--mas-on-surface);
         }
 
         .mas-result-content blockquote {
-            border-left: 4px solid var(--md-sys-color-primary-container);
+            border-left: 4px solid var(--mas-primary);
+            background-color: var(--mas-surface-variant);
             margin: 1em 0;
-            padding-left: 16px;
-            color: #555;
+            padding: 12px 16px;
+            border-radius: 0 12px 12px 0;
+            color: var(--mas-on-surface-variant);
         }
 
         /* 遮罩层 */
@@ -402,9 +451,27 @@
     const mainSheet = document.createElement('div');
     mainSheet.className = 'mas-bottom-sheet';
     
+    // 应用主题
+    function applyTheme() {
+        const theme = config.theme;
+        if (theme === 'dark') {
+            mainSheet.setAttribute('data-theme', 'dark');
+        } else if (theme === 'light') {
+            mainSheet.setAttribute('data-theme', 'light');
+        } else {
+            // Auto
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                mainSheet.setAttribute('data-theme', 'dark');
+            } else {
+                mainSheet.setAttribute('data-theme', 'light');
+            }
+        }
+    }
+
     // 渲染主面板内容
     function renderSheetContent(view = 'home', data = null) {
         let content = '';
+        applyTheme();
         
         if (view === 'home') {
             content = `
@@ -419,8 +486,8 @@
                         </button>
                     </div>
                     <div style="margin-bottom: 24px;">
-                        <p style="margin-bottom: 8px; font-size: 14px; color: var(--md-sys-color-outline);">当前页面：</p>
-                        <p style="font-weight: 500; line-height: 1.4;">${document.title}</p>
+                        <p style="margin-bottom: 8px; font-size: 14px; color: var(--mas-on-surface-variant);">当前页面：</p>
+                        <p style="font-weight: 500; line-height: 1.4; color: var(--mas-on-surface);">${document.title}</p>
                     </div>
                     <button class="mas-btn" id="masStartSummary">
                         <svg style="width:20px;height:20px;margin-right:8px;fill:currentColor" viewBox="0 0 24 24">
@@ -441,6 +508,14 @@
                                 <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
                             </svg>
                         </button>
+                    </div>
+                    <div class="mas-input-group">
+                        <label class="mas-label">主题</label>
+                        <select class="mas-select" id="masTheme">
+                            <option value="auto" ${config.theme === 'auto' ? 'selected' : ''}>跟随系统</option>
+                            <option value="light" ${config.theme === 'light' ? 'selected' : ''}>浅色模式</option>
+                            <option value="dark" ${config.theme === 'dark' ? 'selected' : ''}>深色模式</option>
+                        </select>
                     </div>
                     <div class="mas-input-group">
                         <label class="mas-label">API URL</label>
@@ -467,11 +542,7 @@
                 <div class="mas-sheet-content">
                     <div class="mas-sheet-header">
                         <span>总结结果</span>
-                        <button class="mas-icon-btn" id="masCloseResult">
-                            <svg style="width:24px;height:24px;fill:currentColor" viewBox="0 0 24 24">
-                                <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
-                            </svg>
-                        </button>
+                        <!-- 关闭按钮已移除 -->
                     </div>
                     <div id="masResultContent" class="mas-result-content">${data || '<p>正在生成...</p>'}</div>
                     <div class="mas-actions">
@@ -500,22 +571,20 @@
                 config.apiKey = document.getElementById('masApiKey').value;
                 config.prompt = document.getElementById('masPrompt').value;
                 config.model = document.getElementById('masModel').value;
+                config.theme = document.getElementById('masTheme').value;
 
                 GM.setValue('apiUrl', config.apiUrl);
                 GM.setValue('apiKey', config.apiKey);
                 GM.setValue('prompt', config.prompt);
                 GM.setValue('model', config.model);
+                GM.setValue('theme', config.theme);
                 
+                applyTheme(); // 立即应用主题
                 alert('配置已保存');
                 renderSheetContent('home');
             });
         } else if (view === 'result') {
-            document.getElementById('masCloseResult').addEventListener('click', () => {
-                mainSheet.classList.remove('show');
-                hideOverlay();
-                // 延迟重置为首页
-                setTimeout(() => renderSheetContent('home'), 300);
-            });
+            // 移除关闭按钮事件绑定
             
             const copyBtn = document.getElementById('masCopyBtn');
             if (copyBtn) {
