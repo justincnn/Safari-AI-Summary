@@ -313,7 +313,15 @@
     // 悬浮按钮
     const fab = document.createElement('div');
     fab.className = 'sas-container sas-glass sas-fab';
-    fab.innerHTML = '🤖';
+    // 使用 SF Symbols 风格的 SVG 图标
+    fab.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 3H5C3.89 3 3 3.89 3 5V19C3 20.11 3.89 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.89 20.11 3 19 3ZM19 19H5V5H19V19Z" fill="currentColor"/>
+            <path d="M7 7H17V9H7V7Z" fill="currentColor"/>
+            <path d="M7 11H17V13H7V11Z" fill="currentColor"/>
+            <path d="M7 15H14V17H7V15Z" fill="currentColor"/>
+        </svg>
+    `;
     fab.title = 'AI 页面总结 (右键设置)';
     document.body.appendChild(fab);
 
@@ -539,6 +547,7 @@
     // --- 事件监听 ---
 
     fab.addEventListener('click', (e) => {
+        e.stopPropagation(); // 阻止事件冒泡
         if (!isDragging) {
             if (isPanelOpen) closePanel();
             else openPanel('summary');
@@ -547,6 +556,7 @@
 
     fab.addEventListener('contextmenu', (e) => {
         e.preventDefault();
+        e.stopPropagation(); // 阻止事件冒泡
         if (!isDragging) {
             openPanel('settings');
         }
@@ -554,9 +564,15 @@
 
     // 点击外部关闭
     document.addEventListener('click', (e) => {
+        // 确保点击的不是面板内部或悬浮球
         if (isPanelOpen && !panel.contains(e.target) && !fab.contains(e.target)) {
             closePanel();
         }
+    });
+    
+    // 阻止面板内部点击事件冒泡到 document
+    panel.addEventListener('click', (e) => {
+        e.stopPropagation();
     });
 
     // --- 菜单命令 ---
