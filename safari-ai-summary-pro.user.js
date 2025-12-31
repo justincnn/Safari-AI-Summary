@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Safari AI Summary Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.6
 // @description  Safari 专用 AI 页面总结工具，采用毛玻璃UI，支持暗黑模式，优化运行效率
 // @author       Justin Ye
 // @match        *://*/*
@@ -338,15 +338,68 @@ try {
         }
         .sas-btn.secondary:hover { background: rgba(128,128,128,0.1); }
 
-        /* Markdown 内容 */
-        .sas-markdown { line-height: 1.6; font-size: 15px; }
-        .sas-markdown h1, .sas-markdown h2, .sas-markdown h3 { margin-top: 1em; margin-bottom: 0.5em; color: var(--text-primary); }
-        .sas-markdown p { margin-bottom: 1em; color: var(--text-primary); }
-        .sas-markdown ul, .sas-markdown ol { padding-left: 20px; margin-bottom: 1em; }
-        .sas-markdown li { margin-bottom: 0.5em; }
-        .sas-markdown code { background: rgba(128,128,128,0.15); padding: 2px 4px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
-        .sas-markdown pre { background: rgba(128,128,128,0.1); padding: 12px; border-radius: var(--radius-sm); overflow-x: auto; }
-        .sas-markdown blockquote { border-left: 3px solid var(--accent-color); margin: 0; padding-left: 12px; color: var(--text-secondary); }
+        /* Markdown 内容优化 */
+        .sas-markdown {
+            line-height: 1.7;
+            font-size: 16px;
+            color: var(--text-primary);
+        }
+        .sas-markdown h1, .sas-markdown h2 {
+            margin-top: 1.2em;
+            margin-bottom: 0.6em;
+            font-weight: 700;
+            line-height: 1.3;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 0.3em;
+            color: var(--text-primary);
+        }
+        .sas-markdown h3 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .sas-markdown p {
+            margin-bottom: 1em;
+            text-align: justify;
+            color: var(--text-primary);
+        }
+        .sas-markdown ul, .sas-markdown ol {
+            padding-left: 24px;
+            margin-bottom: 1em;
+        }
+        .sas-markdown li {
+            margin-bottom: 0.5em;
+        }
+        .sas-markdown li::marker {
+            color: var(--accent-color);
+        }
+        .sas-markdown strong {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+        .sas-markdown blockquote {
+            border-left: 4px solid var(--accent-color);
+            margin: 1em 0;
+            padding: 8px 16px;
+            background: rgba(128,128,128,0.05);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            color: var(--text-secondary);
+        }
+        .sas-markdown code {
+            background: rgba(128,128,128,0.15);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "SF Mono", Consolas, monospace;
+            font-size: 0.9em;
+            color: var(--accent-color);
+        }
+        .sas-markdown pre {
+            background: rgba(128,128,128,0.1);
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+        }
 
         /* 底部操作栏 */
         .sas-actions {
@@ -735,6 +788,8 @@ try {
                 closePanel();
             } else {
                 openPanel();
+                // 快捷键直接开始总结
+                startSummary();
             }
         }
     });
