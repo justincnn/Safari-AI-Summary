@@ -9,6 +9,7 @@
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
+// @require      https://cdn.jsdelivr.net/npm/marked/marked.min.js
 // @connect      api.openai.com
 // @connect      *
 // ==/UserScript==
@@ -109,27 +110,10 @@
         shortcut: GM.getValue('shortcut', defaultConfig.shortcut)
     };
 
-    // Lazy Load Marked.js
-    let markedLoaded = false;
-    const loadMarked = () => {
-        if (markedLoaded && typeof marked !== 'undefined') return Promise.resolve();
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
-            script.onload = () => {
-                markedLoaded = true;
-                // 确保 marked 在全局作用域可用
-                if (typeof marked === 'undefined' && window.marked) {
-                    window.marked.setOptions({ breaks: true, gfm: true });
-                } else if (typeof marked !== 'undefined') {
-                    marked.setOptions({ breaks: true, gfm: true });
-                }
-                resolve();
-            };
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    };
+    // 配置 marked
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({ breaks: true, gfm: true });
+    }
 
     // --- UI 构建 (Glassmorphism) ---
 
@@ -523,10 +507,7 @@
             // 1. 获取页面内容
             const pageContent = document.body.innerText.substring(0, 6000); // 增加字符限制
 
-            // 2. 加载 marked.js
-            await loadMarked();
-
-            // 3. 调用 API
+            // 2. 调用 API
             const response = await gmFetch(config.apiUrl, {
                 method: 'POST',
                 headers: {
@@ -545,9 +526,8 @@
             const data = await response.json();
             if (data.choices && data.choices[0]) {
                 const markdown = data.choices[0].message.content;
-                // 兼容 marked 调用
-                const markedFunc = (typeof marked !== 'undefined') ? marked.parse : window.marked.parse;
-                resultArea.innerHTML = markedFunc(markdown);
+                // 使用 @require 引入的 marked
+                resultArea.innerHTML = marked.parse(markdown);
                 
                 // 添加复制按钮
                 const copyBtn = document.createElement('button');
