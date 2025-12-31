@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Safari AI Summary Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Safari 专用 AI 页面总结工具，采用毛玻璃UI，支持暗黑模式，优化运行效率
 // @author       Justin Ye
 // @match        *://*/*
@@ -15,9 +15,18 @@
 // ==/UserScript==
 
 (function() {
-    'use strict';
+'use strict';
 
-    // --- 核心工具函数 ---
+// 兼容性处理：获取正确的 window 对象
+let targetWindow = window;
+try {
+    if (typeof unsafeWindow !== 'undefined') targetWindow = unsafeWindow;
+    else if (window.unsafeWindow) targetWindow = window.unsafeWindow;
+} catch (e) {
+    console.warn('unsafeWindow access failed, falling back to window', e);
+}
+
+// --- 核心工具函数 ---
 
     // 封装 GM_xmlhttpRequest 为 Promise，解决跨域问题
     function gmFetch(url, options) {
@@ -114,7 +123,7 @@
     let markedLoaded = false;
     const loadMarked = () => {
         // Check if already loaded in page
-        if (typeof unsafeWindow.marked !== 'undefined') {
+        if (typeof targetWindow.marked !== 'undefined') {
             markedLoaded = true;
             return Promise.resolve();
         }
@@ -125,8 +134,8 @@
             script.onload = () => {
                 markedLoaded = true;
                 // Configure marked in page context
-                if (unsafeWindow.marked) {
-                    unsafeWindow.marked.setOptions({ breaks: true, gfm: true });
+                if (targetWindow.marked) {
+                    targetWindow.marked.setOptions({ breaks: true, gfm: true });
                 }
                 resolve();
             };
@@ -249,7 +258,7 @@
             font-size: 18px;
         }
 
-        .sas-close-btn {
+        .sas-close-btn, .sas-icon-btn {
             background: none;
             border: none;
             color: var(--text-secondary);
@@ -258,13 +267,28 @@
             padding: 4px;
             border-radius: 50%;
             transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
         }
-        .sas-close-btn:hover { background: rgba(128,128,128,0.1); }
+        .sas-close-btn:hover, .sas-icon-btn:hover { background: rgba(128,128,128,0.1); }
 
         .sas-content {
             padding: 20px;
             overflow-y: auto;
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        #sas-settings-panel {
+            background: rgba(128,128,128,0.05);
+            padding: 15px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
         }
 
         /* 表单元素 */
@@ -374,7 +398,7 @@
     // --- 逻辑处理 ---
 
     let isPanelOpen = false;
-    let currentView = 'summary'; // 'summary' or 'settings'
+    let isSettingsOpen = false;
 
     function applyTheme() {
         const theme = config.theme;
@@ -385,17 +409,14 @@
         }
     }
 
-    function renderPanel(view) {
-        currentView = view;
+    function renderPanel() {
         applyTheme();
         
-        let headerTitle = '';
-        let contentHtml = '';
-        let actionsHtml = '';
+        // 如果没有 API Key，默认展开设置
+        if (!config.apiKey) isSettingsOpen = true;
 
-        if (view === 'settings') {
-            headerTitle = '设置';
-            contentHtml = `
+        const settingsHtml = `
+            <div id="sas-settings-panel" style="display: ${isSettingsOpen ? 'block' : 'none'}">
                 <div class="sas-input-group">
                     <label class="sas-label">API URL</label>
                     <input type="text" class="sas-input" id="sas-api-url" value="${config.apiUrl}">
@@ -413,7 +434,7 @@
                     <textarea class="sas-textarea" id="sas-prompt">${config.prompt}</textarea>
                 </div>
                 <div class="sas-input-group">
-                    <label class="sas-label">快捷键 (Shortcut)</label>
+                    <label class="sas-label">快捷键 (Shortcut) - 点击输入，Backspace 清除</label>
                     <input type="text" class="sas-input" id="sas-shortcut" value="${config.shortcut}" placeholder="例如: Alt+A" readonly>
                 </div>
                 <div class="sas-input-group">
@@ -424,63 +445,87 @@
                         <option value="dark" ${config.theme === 'dark' ? 'selected' : ''}>深色</option>
                     </select>
                 </div>
-            `;
-            actionsHtml = `
-                <button class="sas-btn secondary" id="sas-cancel-settings">取消</button>
-                <button class="sas-btn" id="sas-save-settings" style="width: auto;">保存配置</button>
-            `;
-        } else {
-            headerTitle = '页面总结';
-            contentHtml = `<div id="sas-result-area" class="sas-markdown"><p>点击下方按钮开始生成总结...</p></div>`;
-            actionsHtml = `
-                <button class="sas-btn secondary" id="sas-open-settings" style="width: auto;">设置</button>
-                <button class="sas-btn" id="sas-start-summary" style="width: auto;">开始总结</button>
-            `;
-        }
+                <button class="sas-btn" id="sas-save-settings">保存配置</button>
+            </div>
+        `;
+
+        const resultHtml = `<div id="sas-result-area" class="sas-markdown"><p>点击下方按钮开始生成总结...</p></div>`;
 
         panel.innerHTML = `
             <div class="sas-header">
-                <span>${headerTitle}</span>
-                <button class="sas-close-btn">×</button>
+                <span>AI 页面总结</span>
+                <div style="display:flex; gap:8px;">
+                    <button class="sas-icon-btn" id="sas-toggle-settings" title="设置">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </button>
+                    <button class="sas-close-btn">×</button>
+                </div>
             </div>
-            <div class="sas-content">${contentHtml}</div>
-            <div class="sas-actions">${actionsHtml}</div>
+            <div class="sas-content">
+                ${settingsHtml}
+                ${resultHtml}
+            </div>
+            <div class="sas-actions">
+                <button class="sas-btn" id="sas-start-summary">开始总结</button>
+            </div>
         `;
 
         // 绑定事件
         panel.querySelector('.sas-close-btn').onclick = closePanel;
+        document.getElementById('sas-toggle-settings').onclick = () => {
+            isSettingsOpen = !isSettingsOpen;
+            const settingsPanel = document.getElementById('sas-settings-panel');
+            settingsPanel.style.display = isSettingsOpen ? 'block' : 'none';
+        };
 
-        if (view === 'settings') {
-            document.getElementById('sas-cancel-settings').onclick = () => renderPanel('summary');
-            document.getElementById('sas-save-settings').onclick = saveSettings;
+        document.getElementById('sas-save-settings').onclick = saveSettings;
+        document.getElementById('sas-start-summary').onclick = startSummary;
+        
+        // 快捷键录入
+        const shortcutInput = document.getElementById('sas-shortcut');
+        shortcutInput.addEventListener('keydown', (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // 防止冲突
+
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                shortcutInput.value = '';
+                return;
+            }
+
+            const keys = [];
+            if (e.ctrlKey) keys.push('Ctrl');
+            if (e.altKey) keys.push('Alt');
+            if (e.shiftKey) keys.push('Shift');
+            if (e.metaKey) keys.push('Meta');
             
-            // 快捷键录入
-            const shortcutInput = document.getElementById('sas-shortcut');
-            shortcutInput.addEventListener('keydown', (e) => {
-                e.preventDefault();
-                const keys = [];
-                if (e.ctrlKey) keys.push('Ctrl');
-                if (e.altKey) keys.push('Alt');
-                if (e.shiftKey) keys.push('Shift');
-                if (e.metaKey) keys.push('Meta');
-                
-                const key = e.key.toUpperCase();
-                if (!['CONTROL', 'ALT', 'SHIFT', 'META'].includes(key)) {
-                    keys.push(key);
-                }
-                
-                if (keys.length > 0) {
-                    shortcutInput.value = keys.join('+');
-                }
-            });
-        } else {
-            document.getElementById('sas-open-settings').onclick = () => renderPanel('settings');
-            document.getElementById('sas-start-summary').onclick = startSummary;
-        }
+            let key = e.key.toUpperCase();
+            // 同样使用 e.code 处理
+            if (e.code.startsWith('Key')) {
+                key = e.code.slice(3).toUpperCase();
+            } else if (e.code.startsWith('Digit')) {
+                key = e.code.slice(5);
+            }
+
+            if (!['CONTROL', 'ALT', 'SHIFT', 'META', 'BACKSPACE', 'DELETE'].includes(key)) {
+                keys.push(key);
+            }
+            
+            if (keys.length > 0) {
+                shortcutInput.value = keys.join('+');
+            }
+        });
     }
 
-    function openPanel(view = 'summary') {
-        renderPanel(view);
+    function openPanel() {
+        if (!panel.innerHTML) renderPanel(); // 初始化
+        else {
+             // 重新绑定事件或更新状态（如果需要）
+             // 这里简单处理，每次打开都重新渲染以保证状态最新，或者只更新显示
+             renderPanel();
+        }
         panel.classList.add('show');
         isPanelOpen = true;
     }
@@ -506,13 +551,25 @@
         GM.setValue('shortcut', config.shortcut);
 
         alert('配置已保存');
-        renderPanel('summary');
+        applyTheme();
+        // 保持设置面板打开或关闭取决于用户当前状态，这里不做改变
     }
 
     async function startSummary() {
+        // 尝试从输入框获取最新配置（如果用户修改了但没点保存）
+        const apiKeyInput = document.getElementById('sas-api-key');
+        if (apiKeyInput) {
+            config.apiKey = apiKeyInput.value;
+            // 也可以顺便更新其他配置
+            config.apiUrl = document.getElementById('sas-api-url').value;
+            config.model = document.getElementById('sas-model').value;
+            config.prompt = document.getElementById('sas-prompt').value;
+        }
+
         if (!config.apiKey) {
             alert('请先配置 API Key');
-            renderPanel('settings');
+            isSettingsOpen = true;
+            renderPanel();
             return;
         }
 
@@ -549,8 +606,8 @@
             const data = await response.json();
             if (data.choices && data.choices[0]) {
                 const markdown = data.choices[0].message.content;
-                // 使用 unsafeWindow.marked
-                const markedFunc = unsafeWindow.marked ? unsafeWindow.marked.parse : (text) => text;
+                // 使用 targetWindow.marked
+                const markedFunc = targetWindow.marked ? targetWindow.marked.parse : (text) => text;
                 resultArea.innerHTML = markedFunc(markdown);
                 
                 // 添加复制按钮
@@ -619,7 +676,7 @@
         e.stopPropagation(); // 阻止事件冒泡
         if (!isDragging) {
             if (isPanelOpen) closePanel();
-            else openPanel('summary');
+            else openPanel();
         }
     });
 
@@ -627,7 +684,8 @@
         e.preventDefault();
         e.stopPropagation(); // 阻止事件冒泡
         if (!isDragging) {
-            openPanel('settings');
+            isSettingsOpen = true;
+            openPanel();
         }
     });
 
@@ -654,7 +712,17 @@
         if (e.shiftKey) keys.push('Shift');
         if (e.metaKey) keys.push('Meta');
         
-        const key = e.key.toUpperCase();
+        // 使用 e.code 来获取物理按键，避免大小写和布局问题
+        // e.key 可能会受到输入法影响
+        let key = e.key.toUpperCase();
+        
+        // 特殊处理一些按键
+        if (e.code.startsWith('Key')) {
+            key = e.code.slice(3).toUpperCase();
+        } else if (e.code.startsWith('Digit')) {
+            key = e.code.slice(5);
+        }
+
         if (!['CONTROL', 'ALT', 'SHIFT', 'META'].includes(key)) {
             keys.push(key);
         }
@@ -662,23 +730,18 @@
         const currentShortcut = keys.join('+');
         if (currentShortcut === config.shortcut) {
             e.preventDefault();
+            e.stopPropagation();
             if (isPanelOpen) {
                 closePanel();
             } else {
-                openPanel('summary');
-                // 可选：快捷键直接开始总结
-                // startSummary();
+                openPanel();
             }
         }
     });
 
     // --- 菜单命令 ---
     if (typeof GM_registerMenuCommand !== 'undefined') {
-        GM_registerMenuCommand("打开设置", () => openPanel('settings'));
-        GM_registerMenuCommand("开始总结", () => {
-            openPanel('summary');
-            startSummary();
-        });
+        GM_registerMenuCommand("打开面板", () => openPanel());
     }
 
 })();
