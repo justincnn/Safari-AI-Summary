@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Safari AI Summary Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Safari 专用 AI 页面总结工具，采用毛玻璃UI，支持暗黑模式，优化运行效率
 // @author       Justin Ye
 // @match        *://*/*
