@@ -9,7 +9,7 @@
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
-// @require      https://cdn.jsdelivr.net/npm/marked/marked.min.js
+// @grant        unsafeWindow
 // @connect      api.openai.com
 // @connect      *
 // ==/UserScript==
@@ -110,10 +110,30 @@
         shortcut: GM.getValue('shortcut', defaultConfig.shortcut)
     };
 
-    // 配置 marked
-    if (typeof marked !== 'undefined') {
-        marked.setOptions({ breaks: true, gfm: true });
-    }
+    // Lazy Load Marked.js
+    let markedLoaded = false;
+    const loadMarked = () => {
+        // Check if already loaded in page
+        if (typeof unsafeWindow.marked !== 'undefined') {
+            markedLoaded = true;
+            return Promise.resolve();
+        }
+
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+            script.onload = () => {
+                markedLoaded = true;
+                // Configure marked in page context
+                if (unsafeWindow.marked) {
+                    unsafeWindow.marked.setOptions({ breaks: true, gfm: true });
+                }
+                resolve();
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    };
 
     // --- UI 构建 (Glassmorphism) ---
 
@@ -507,7 +527,10 @@
             // 1. 获取页面内容
             const pageContent = document.body.innerText.substring(0, 6000); // 增加字符限制
 
-            // 2. 调用 API
+            // 2. 加载 marked.js
+            await loadMarked();
+
+            // 3. 调用 API
             const response = await gmFetch(config.apiUrl, {
                 method: 'POST',
                 headers: {
@@ -526,8 +549,9 @@
             const data = await response.json();
             if (data.choices && data.choices[0]) {
                 const markdown = data.choices[0].message.content;
-                // 使用 @require 引入的 marked
-                resultArea.innerHTML = marked.parse(markdown);
+                // 使用 unsafeWindow.marked
+                const markedFunc = unsafeWindow.marked ? unsafeWindow.marked.parse : (text) => text;
+                resultArea.innerHTML = markedFunc(markdown);
                 
                 // 添加复制按钮
                 const copyBtn = document.createElement('button');
