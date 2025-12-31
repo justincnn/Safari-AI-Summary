@@ -49,12 +49,43 @@
     }
 
     // 配置管理
+    const newPrompt = `你是一个专业的中文内容总结器。你的任务是分析提供的网页内容，**识别内容类型（例如：新闻报道、研究报告、普通文章、市场分析等）**，并在此基础上创建一个清晰、简洁、结构良好的中文总结。**总结必须严格依据原文内容，不得进行任何推测、假设或添加原文中未包含的信息。**
+
+请严格遵守以下指南：
+
+1.  **内容类型识别与结构确定:**
+    *   首先识别原文的内容类型。
+    *   根据内容类型，确定最合适的分段和总结重点。总结的结构应该逻辑清晰，反映原文的核心信息。
+    *   你可以使用 **\`##\`** 作为主要分段的标题，例如：对于新闻可以使用“事件概述”、“关键进展”等，对于报告可以使用“主要发现”、“数据支持”等。不必拘泥于原文的固定分段，但要确保覆盖核心要点。
+
+2.  **输出格式:**
+    *   使用 **\`##\`** 表示主要段落标题。
+    *   使用 **\`•\`** 表示段落内的关键点和细节。
+    *   使用 **粗体** 突出重要术语、概念或关键信息。
+    *   使用 **\`>\`** 表示引人注目的原文引述（如果适用）。
+
+3.  **内容要求:**
+    *   总结必须**严格忠于原文**，不允许加入任何个人观点、推测或假设。
+    *   **识别并保留原文中的重要数据、数字、统计信息或关键事实。**
+    *   根据识别的内容类型，调整总结的侧重点，但**所有信息必须来源于原文**。
+
+4.  **写作风格:**
+    *   语言清晰简洁。
+    *   专业且客观的语调。
+    *   逻辑流畅。
+    *   易于理解。
+    *   聚焦于原文的核心信息和重要细节。
+
+5.  **重要规则:**
+    *   **DO NOT show your reasoning process.** (不要显示你的思考过程或内部步骤。)`;
+
     const defaultConfig = {
         apiUrl: 'https://api.openai.com/v1/chat/completions',
         apiKey: '',
         model: 'gpt-3.5-turbo',
-        prompt: '请对以下网页内容进行简要总结，突出重点信息。使用Markdown格式，包含标题和列表。',
-        theme: 'auto' // auto, light, dark
+        prompt: newPrompt,
+        theme: 'auto', // auto, light, dark
+        shortcut: 'Alt+A'
     };
 
     const GM = {
@@ -74,19 +105,25 @@
         apiKey: GM.getValue('apiKey', defaultConfig.apiKey),
         model: GM.getValue('model', defaultConfig.model),
         prompt: GM.getValue('prompt', defaultConfig.prompt),
-        theme: GM.getValue('theme', defaultConfig.theme)
+        theme: GM.getValue('theme', defaultConfig.theme),
+        shortcut: GM.getValue('shortcut', defaultConfig.shortcut)
     };
 
     // Lazy Load Marked.js
     let markedLoaded = false;
     const loadMarked = () => {
-        if (markedLoaded) return Promise.resolve();
+        if (markedLoaded && typeof marked !== 'undefined') return Promise.resolve();
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
             script.onload = () => {
                 markedLoaded = true;
-                marked.setOptions({ breaks: true, gfm: true });
+                // 确保 marked 在全局作用域可用
+                if (typeof marked === 'undefined' && window.marked) {
+                    window.marked.setOptions({ breaks: true, gfm: true });
+                } else if (typeof marked !== 'undefined') {
+                    marked.setOptions({ breaks: true, gfm: true });
+                }
                 resolve();
             };
             script.onerror = reject;
@@ -372,6 +409,10 @@
                     <textarea class="sas-textarea" id="sas-prompt">${config.prompt}</textarea>
                 </div>
                 <div class="sas-input-group">
+                    <label class="sas-label">快捷键 (Shortcut)</label>
+                    <input type="text" class="sas-input" id="sas-shortcut" value="${config.shortcut}" placeholder="例如: Alt+A" readonly>
+                </div>
+                <div class="sas-input-group">
                     <label class="sas-label">主题</label>
                     <select class="sas-select" id="sas-theme">
                         <option value="auto" ${config.theme === 'auto' ? 'selected' : ''}>跟随系统</option>
@@ -408,6 +449,26 @@
         if (view === 'settings') {
             document.getElementById('sas-cancel-settings').onclick = () => renderPanel('summary');
             document.getElementById('sas-save-settings').onclick = saveSettings;
+            
+            // 快捷键录入
+            const shortcutInput = document.getElementById('sas-shortcut');
+            shortcutInput.addEventListener('keydown', (e) => {
+                e.preventDefault();
+                const keys = [];
+                if (e.ctrlKey) keys.push('Ctrl');
+                if (e.altKey) keys.push('Alt');
+                if (e.shiftKey) keys.push('Shift');
+                if (e.metaKey) keys.push('Meta');
+                
+                const key = e.key.toUpperCase();
+                if (!['CONTROL', 'ALT', 'SHIFT', 'META'].includes(key)) {
+                    keys.push(key);
+                }
+                
+                if (keys.length > 0) {
+                    shortcutInput.value = keys.join('+');
+                }
+            });
         } else {
             document.getElementById('sas-open-settings').onclick = () => renderPanel('settings');
             document.getElementById('sas-start-summary').onclick = startSummary;
@@ -431,12 +492,14 @@
         config.model = document.getElementById('sas-model').value;
         config.prompt = document.getElementById('sas-prompt').value;
         config.theme = document.getElementById('sas-theme').value;
+        config.shortcut = document.getElementById('sas-shortcut').value;
 
         GM.setValue('apiUrl', config.apiUrl);
         GM.setValue('apiKey', config.apiKey);
         GM.setValue('model', config.model);
         GM.setValue('prompt', config.prompt);
         GM.setValue('theme', config.theme);
+        GM.setValue('shortcut', config.shortcut);
 
         alert('配置已保存');
         renderPanel('summary');
@@ -482,7 +545,9 @@
             const data = await response.json();
             if (data.choices && data.choices[0]) {
                 const markdown = data.choices[0].message.content;
-                resultArea.innerHTML = marked.parse(markdown);
+                // 兼容 marked 调用
+                const markedFunc = (typeof marked !== 'undefined') ? marked.parse : window.marked.parse;
+                resultArea.innerHTML = markedFunc(markdown);
                 
                 // 添加复制按钮
                 const copyBtn = document.createElement('button');
@@ -573,6 +638,34 @@
     // 阻止面板内部点击事件冒泡到 document
     panel.addEventListener('click', (e) => {
         e.stopPropagation();
+    });
+
+    // 全局快捷键监听
+    document.addEventListener('keydown', (e) => {
+        if (!config.shortcut) return;
+        
+        const keys = [];
+        if (e.ctrlKey) keys.push('Ctrl');
+        if (e.altKey) keys.push('Alt');
+        if (e.shiftKey) keys.push('Shift');
+        if (e.metaKey) keys.push('Meta');
+        
+        const key = e.key.toUpperCase();
+        if (!['CONTROL', 'ALT', 'SHIFT', 'META'].includes(key)) {
+            keys.push(key);
+        }
+        
+        const currentShortcut = keys.join('+');
+        if (currentShortcut === config.shortcut) {
+            e.preventDefault();
+            if (isPanelOpen) {
+                closePanel();
+            } else {
+                openPanel('summary');
+                // 可选：快捷键直接开始总结
+                // startSummary();
+            }
+        }
     });
 
     // --- 菜单命令 ---
