@@ -645,16 +645,20 @@ Remember: Focus on delivering the information directly without any meta-analysis
             `;
         }
         
-        // 设置图标样式 - macOS 毛玻璃效果
+        // 设置图标样式 - macOS 26 液态玻璃风格
         const isDark = config.theme === 'dark';
         const glassStyle = isDark ? `
-            background: rgba(40, 40, 40, 0.65) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+            background: linear-gradient(135deg, rgba(50, 50, 50, 0.7), rgba(30, 30, 30, 0.4)) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow:
+                0 8px 32px 0 rgba(0, 0, 0, 0.3) !important,
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
         ` : `
-            background: rgba(255, 255, 255, 0.65) !important;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4)) !important;
             border: 1px solid rgba(255, 255, 255, 0.4) !important;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15) !important;
+            box-shadow:
+                0 8px 32px 0 rgba(31, 38, 135, 0.1) !important,
+                inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
         `;
 
         icon.style.cssText = `
@@ -664,18 +668,18 @@ Remember: Focus on delivering the information directly without any meta-analysis
             ${glassStyle}
             width: auto !important;
             height: auto !important;
-            padding: 10px !important;
+            padding: 12px !important;
             font-size: ${browserSupport.isMobile ? '20px' : '24px'} !important;
             line-height: 1 !important;
             cursor: pointer !important;
             user-select: none !important;
             -webkit-user-select: none !important;
             visibility: visible !important;
-            opacity: 0.9;
-            transition: all 0.3s ease !important;
-            border-radius: 14px !important;
-            backdrop-filter: blur(15px) saturate(180%) !important;
-            -webkit-backdrop-filter: blur(15px) saturate(180%) !important;
+            opacity: 1;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+            border-radius: 18px !important;
+            backdrop-filter: blur(20px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
         `;
 
         // 添加鼠标悬停效果
@@ -939,13 +943,13 @@ Remember: Focus on delivering the information directly without any meta-analysis
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background-color: ${isDark ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.2)'};
-                backdrop-filter: blur(8px);
-                -webkit-backdrop-filter: blur(8px);
+                background-color: ${isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.1)'};
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
                 z-index: 999997;
                 display: none;
                 opacity: 0;
-                transition: opacity 0.3s ease;
+                transition: opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
             `;
             
             backdrop.addEventListener('click', (e) => {
@@ -988,15 +992,19 @@ Remember: Focus on delivering the information directly without any meta-analysis
         
         const isDark = config.theme === 'dark';
         
-        // macOS 毛玻璃效果样式
+        // macOS 26 液态玻璃风格
         const glassStyle = isDark ? `
-            background: rgba(40, 40, 40, 0.75);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            background: linear-gradient(135deg, rgba(40, 40, 40, 0.8), rgba(20, 20, 20, 0.6));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.5),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
         ` : `
-            background: rgba(255, 255, 255, 0.75);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6));
             border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.1),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.2);
         `;
 
         let styles = `
@@ -1004,8 +1012,8 @@ Remember: Focus on delivering the information directly without any meta-analysis
             z-index: 999998;
             ${glassStyle}
             color: ${isDark ? darkColors.text : '#333'};
-            border-radius: ${browserSupport.isMobile ? '16px' : '18px'};
-            padding: ${browserSupport.isMobile ? '16px' : '20px'};
+            border-radius: ${browserSupport.isMobile ? '20px' : '24px'};
+            padding: ${browserSupport.isMobile ? '16px' : '24px'};
             width: ${browserSupport.isMobile ? '92%' : '80%'};
             max-width: ${browserSupport.isMobile ? '100%' : '800px'};
             max-height: ${browserSupport.isMobile ? '85vh' : '80vh'};
@@ -1016,12 +1024,12 @@ Remember: Focus on delivering the information directly without any meta-analysis
             transform: translate(-50%, -50%);
             overflow: hidden;
             opacity: 0;
-            transition: opacity 0.3s ease;
-            will-change: transform;
+            transition: opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            will-change: transform, opacity;
             -webkit-backface-visibility: hidden;
             backface-visibility: hidden;
-            backdrop-filter: blur(25px) saturate(180%);
-            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
         `;
 
         container.style.cssText = styles;
@@ -1447,15 +1455,19 @@ Remember: Focus on delivering the information directly without any meta-analysis
         // 基础样式
         const isDark = config.theme === 'dark';
         
-        // macOS 毛玻璃效果样式
+        // macOS 26 液态玻璃风格
         const glassStyle = isDark ? `
-            background: rgba(40, 40, 40, 0.75);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            background: linear-gradient(135deg, rgba(40, 40, 40, 0.8), rgba(20, 20, 20, 0.6));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.5),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
         ` : `
-            background: rgba(255, 255, 255, 0.75);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6));
             border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.1),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.2);
         `;
 
         settingsContainer.style.cssText = `
@@ -1463,8 +1475,8 @@ Remember: Focus on delivering the information directly without any meta-analysis
             z-index: 1000000;
             ${glassStyle}
             color: ${isDark ? '#e8eaed' : '#333'};
-            border-radius: 16px;
-            padding: 24px;
+            border-radius: 24px;
+            padding: 28px;
             width: 400px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             display: none;
@@ -1474,8 +1486,9 @@ Remember: Focus on delivering the information directly without any meta-analysis
             will-change: transform;
             -webkit-backface-visibility: hidden;
             backface-visibility: hidden;
-            backdrop-filter: blur(25px) saturate(180%);
-            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            transition: opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
         `;
 
         // 标题栏
