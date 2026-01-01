@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Safari AI Summary Pro
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  Safari 专用 AI 页面总结工具，采用毛玻璃UI，支持暗黑模式，优化运行效率
 // @author       Justin Ye
 // @match        *://*/*
@@ -658,7 +658,11 @@ try {
 
             const data = await response.json();
             if (data.choices && data.choices[0]) {
-                const markdown = data.choices[0].message.content;
+                let markdown = data.choices[0].message.content;
+
+                // 移除可能存在的 Markdown 代码块包裹，确保渲染为阅读模式
+                markdown = markdown.replace(/^```(markdown)?\s*/i, '').replace(/\s*```$/, '');
+
                 // 使用 targetWindow.marked
                 const markedFunc = targetWindow.marked ? targetWindow.marked.parse : (text) => text;
                 resultArea.innerHTML = markedFunc(markdown);
